@@ -1,0 +1,13 @@
+# Exclude all subdirectories (they are separate repos just for analysis)
+ubccr/
+coldfront/
+harvard/
+wustl/
+cci-moc/
+sum/
+umass/
+find_forks/
+
+# Exclude helper files
+INSTRUCTIONS.md
+
