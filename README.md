@@ -8,6 +8,7 @@ This repository contains multiple forks of ColdFront and the Unity Web Portal. T
 - **coldfront/** - UC Berkeley's MyBRC/MyLRC User Portal fork
 - **harvard/coldfront** - Harvard FASRC's fork
 - **wustl/coldfront-wustl-fork** - Washington University in St. Louis fork
+- **nerc/** - NERC project repositories (cloud plugin and Kubernetes deployment)
 - **cci-moc/coldfront** - CCI MOC fork (appears to be standard)
 - **sum/coldfront_pr_base** - SUM fork (appears to be close to upstream)
 - **umass/unity-web-portal** - UMass Unity Portal (PHP-based, completely different architecture)
@@ -315,7 +316,179 @@ WUSTL's fork focuses on Qumulo storage management with modern web technologies.
 
 ---
 
-### 1.4 UBCCR Upstream-Specific Features (Not in Other Forks)
+### 1.4 NERC (New England Research Cloud) - Cloud-Native ColdFront
+
+NERC provides a **cloud-native deployment** of ColdFront with a comprehensive cloud resource management plugin. This is not a traditional fork but rather a containerized deployment with production-ready Kubernetes manifests and a sophisticated OpenStack/OpenShift integration plugin.
+
+#### Repository Structure
+
+The NERC project consists of two repositories:
+
+1. **coldfront-nerc** - Containerized deployment and Kubernetes manifests
+2. **coldfront-plugin-cloud** - Cloud resource allocation plugin
+
+#### Unique Features
+
+1. **Cloud Plugin for ColdFront** ([coldfront-plugin-cloud](https://github.com/nerc-project/coldfront-plugin-cloud))
+   
+   **OpenStack Integration:**
+   - Full OpenStack cloud resource provisioning
+   - Automated project (tenant) creation
+   - Quota management for:
+     - Compute instances, vCPUs, RAM
+     - Block storage volumes
+     - Object storage (Swift)
+     - Floating IPs and networks
+   - Keystone federation support (OIDC)
+   - Application credential authentication
+   - Multi-cloud support (multiple OpenStack instances)
+   - Cinder (block storage) client integration
+   - Neutron (networking) client integration
+   - Nova (compute) client integration
+   - Swift (object storage) client integration
+
+   **OpenShift/Kubernetes Integration:**
+   - OpenShift project (namespace) provisioning
+   - Resource quota management:
+     - CPU limits and requests
+     - Memory limits and requests
+     - Ephemeral storage quotas
+     - Persistent volume claims
+     - GPU quotas (NVIDIA GPUs)
+   - Storage class quotas:
+     - NESE storage (Ceph RBD)
+     - IBM Spectrum Scale storage
+   - Role-based access control (RBAC) automation
+   - ClusterRole assignment
+   - Default LimitRange configuration
+   - Project labels for OpenDataHub/ModelMesh integration
+   - Requires external [openshift-acct-mgt API service](https://github.com/cci-moc/openshift-acct-mgt)
+
+   **OpenShift Virtualization Support:**
+   - Separate `openshift_vm` resource type
+   - GPU-specific quotas for VMs:
+     - NVIDIA A100 SXM4 40GB
+     - NVIDIA V100 (GV100GL)
+     - NVIDIA H100 SXM5 80GB
+   - Virtual machine resource management alongside containers
+
+   **ESI (Elastic Secure Infrastructure) Support:**
+   - Bare metal provisioning via OpenStack Ironic
+   - Network-focused quotas
+   - Specialized for bare metal cloud resources
+
+   **Quota Unit System:**
+   - "Unit of computing" concept to bundle multiple quotas
+   - Single multiplier for multiple resource types
+   - Simplifies quota requests in UI
+   - Automatic distribution to individual resource attributes
+
+2. **Management Commands:**
+   - `add_openstack_resource` - Register OpenStack clouds
+   - `add_openshift_resource` - Register OpenShift clusters
+   - `register_cloud_attributes` - Setup resource attribute types
+   - `calculate_storage_gb_hours` - Storage usage calculation
+   - `convert_swift_quota_to_gib` - Swift quota conversion
+   - `count_gpu_usage` - GPU utilization tracking
+   - `list_cloud_allocations` - Allocation listing
+   - `migrate_fields_of_science` - Data migration utility
+   - `update_eula` - EULA management
+   - `validate_allocations` - Allocation validation
+
+3. **Containerized Deployment** ([coldfront-nerc](https://github.com/nerc-project/coldfront-nerc))
+   
+   **Multi-stage Docker Build:**
+   - Python 3.12 slim-bullseye base
+   - Builder stage for compilation dependencies
+   - Final minimal runtime image
+   - Virtual environment isolation
+   - Custom email templates
+   - Patch system for upstream fixes:
+     - API URLs addition
+     - Allocation status fixes
+     - Active needs renewal status
+     - Allocation change request signals
+
+   **Kubernetes Manifests:**
+   - Production-ready Kustomize configurations
+   - Base manifests:
+     - ColdFront application deployment
+     - Redis for caching/queuing
+     - Static files serving
+     - Invoice cron job
+     - Django Q cluster for async tasks
+   - Overlay configurations:
+     - Development (with MariaDB)
+     - Staging environment
+     - Production environment with HA PostgreSQL
+   - High Availability PostgreSQL:
+     - PostgreSQL Operator integration
+     - Automated backups to S3
+     - PgBackRest configuration
+   - Ingress configurations
+   - ConfigMaps and Secrets management
+
+4. **Authentication & Authorization:**
+   - OpenID Connect (OIDC) via `mozilla-django-oidc`
+   - Mokey OIDC plugin for group sync
+   - Keycloak integration:
+     - User search directly from Keycloak
+     - `coldfront_plugin_keycloak_usersearch` plugin
+     - Environment-based configuration
+   - Multiple identity provider support
+
+5. **Testing Infrastructure:**
+   - Comprehensive unit tests
+   - Functional tests for:
+     - OpenStack allocations
+     - OpenShift allocations
+     - OpenShift VM allocations
+     - ESI allocations
+   - Mock testing with functional test mode
+   - CI/CD scripts for:
+     - DevStack (OpenStack)
+     - MicroStack (lightweight OpenStack)
+     - Microshift (lightweight OpenShift)
+     - Ubuntu setup automation
+     - RadosGW testing
+   - Vagrant-based development environment
+   - Pre-commit hooks with Ruff linter
+
+6. **Production Features:**
+   - Invoice generation (cron job)
+   - Storage GB-hours calculation for billing
+   - GPU usage tracking and reporting
+   - Allocation validation commands
+   - Field of science migration tools
+   - EULA update management
+   - S3-compatible storage for invoices and backups
+
+#### Architecture Philosophy
+
+NERC's approach differs from other forks:
+
+- **Cloud-first**: Designed specifically for OpenStack and OpenShift
+- **Kubernetes-native**: Full production Kubernetes deployment
+- **Plugin-based**: Core ColdFront remains unchanged, all cloud logic in plugin
+- **Multi-cloud**: Can manage multiple OpenStack and OpenShift instances
+- **Container-first**: Docker-based deployment, not traditional server installation
+- **Automated provisioning**: Direct API integration with cloud platforms
+- **Standards-compliant**: Uses OpenStack and Kubernetes standard APIs
+
+#### Key Differentiators
+
+1. **Only solution with production OpenShift integration**
+2. **Only solution with OpenShift Virtualization support**
+3. **Only solution with ESI (bare metal cloud) support**
+4. **Most comprehensive Kubernetes deployment manifests**
+5. **Fully containerized with multi-stage builds**
+6. **High availability PostgreSQL with automated backups**
+7. **GPU-aware quota management (specific GPU models)**
+8. **Storage class-aware quota management**
+
+---
+
+### 1.5 UBCCR Upstream-Specific Features (Not in Other Forks)
 
 While this is the "upstream", it has some features not present in all downstream forks:
 
@@ -458,39 +631,46 @@ External scripts are expected to:
 
 ### Core Features
 
-| Feature | UBCCR | Berkeley | Harvard | WUSTL | CCI-MOC | Unity |
-|---------|-------|----------|---------|-------|---------|-------|
-| **Allocations** | ✓ | ✓✓ | ✓ | ✓ | ✓ | ✗ |
-| **Projects** | ✓ | ✓✓ | ✓ | ✓ | ✓ | ✗ |
-| **Grants** | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| **Publications** | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| **Billing** | ✗ | ✓✓ | ✓ (IFX) | ✗ | ✗ | ✗ |
-| **REST API** | ✗ | ✓✓ | ✓ | ✗ | ✗ | ✓ |
-| **SSH Key Mgmt** | ✗ | ✗ | ✗ | ✗ | ✗ | ✓✓ |
-| **PI Self-Service** | ✗ | ✗ | ✗ | ✗ | ✗ | ✓✓ |
+| Feature | UBCCR | Berkeley | Harvard | WUSTL | NERC | CCI-MOC | Unity |
+|---------|-------|----------|---------|-------|------|---------|-------|
+| **Allocations** | ✓ | ✓✓ | ✓ | ✓ | ✓✓ | ✓ | ✗ |
+| **Projects** | ✓ | ✓✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
+| **Grants** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
+| **Publications** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
+| **Billing** | ✗ | ✓✓ | ✓ (IFX) | ✗ | ✓ | ✗ | ✗ |
+| **REST API** | ✗ | ✓✓ | ✓ | ✗ | ✓ | ✗ | ✓ |
+| **Cloud Integration** | ✗ | ✗ | ✗ | ✗ | ✓✓ | ✗ | ✗ |
+| **Container Deploy** | ✗ | ✗ | ✗ | ✗ | ✓✓ | ✗ | ✗ |
+| **SSH Key Mgmt** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓✓ |
+| **PI Self-Service** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓✓ |
 
 ### Plugin Features
 
-| Plugin/Integration | UBCCR | Berkeley | Harvard | WUSTL | CCI-MOC | Unity |
-|-------------------|-------|----------|---------|-------|---------|-------|
-| **FreeIPA** | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ |
-| **Slurm** | ✓ | ✓ | ✓ | ✓ | ✓ | N/A |
-| **XDMoD** | ✓ | ✓ | ✓ | ✓ | ✓ | N/A |
-| **iQuota** | ✓ | ✓ | ✓ | ✓ | ✓ | N/A |
-| **LDAP User Search** | ✓ | ✓ | ✓ | ✓ | ✓ | N/A |
-| **Mokey OIDC** | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| **Departments** | ✗ | ✓✓ | ✓ | ✗ | ✗ | ✗ |
-| **Hardware Procure** | ✗ | ✓✓ | ✗ | ✗ | ✗ | ✗ |
-| **Auto Compute Alloc** | ✓✓ | ✗ | ✗ | ✗ | ✗ | N/A |
-| **Project OpenLDAP** | ✓✓ | ✗ | ✗ | ✗ | ✗ | N/A |
-| **Qumulo** | ✗ | ✗ | ✗ | ✓✓ | ✗ | N/A |
-| **Isilon** | ✗ | ✗ | ✓✓ | ✗ | ✗ | N/A |
-| **VAST** | ✗ | ✗ | ✓✓ | ✗ | ✗ | N/A |
-| **LFS (Lustre)** | ✗ | ✗ | ✓✓ | ✗ | ✗ | N/A |
-| **IFX Billing** | ✗ | ✗ | ✓✓ | ✗ | ✗ | N/A |
-| **Starfish** | ✗ | ✗ | ✓✓ | ✗ | ✗ | N/A |
-| **SlurmREST** | ✗ | ✗ | ✓✓ | ✗ | ✗ | N/A |
-| **FASRC Custom** | ✗ | ✗ | ✓✓ | ✗ | ✗ | N/A |
+| Plugin/Integration | UBCCR | Berkeley | Harvard | WUSTL | NERC | CCI-MOC | Unity |
+|-------------------|-------|----------|---------|-------|------|---------|-------|
+| **FreeIPA** | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ |
+| **Slurm** | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | N/A |
+| **XDMoD** | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | N/A |
+| **iQuota** | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | N/A |
+| **LDAP User Search** | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | N/A |
+| **Mokey OIDC** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
+| **Departments** | ✗ | ✓✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| **Hardware Procure** | ✗ | ✓✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| **Auto Compute Alloc** | ✓✓ | ✗ | ✗ | ✗ | ✗ | ✗ | N/A |
+| **Project OpenLDAP** | ✓✓ | ✗ | ✗ | ✗ | ✗ | ✗ | N/A |
+| **Qumulo** | ✗ | ✗ | ✗ | ✓✓ | ✗ | ✗ | N/A |
+| **OpenStack** | ✗ | ✗ | ✗ | ✗ | ✓✓ | ✗ | N/A |
+| **OpenShift** | ✗ | ✗ | ✗ | ✗ | ✓✓ | ✗ | N/A |
+| **Keycloak** | ✗ | ✗ | ✗ | ✗ | ✓✓ | ✗ | ✗ |
+| **ESI (Bare Metal)** | ✗ | ✗ | ✗ | ✗ | ✓✓ | ✗ | N/A |
+| **Kubernetes Deploy** | ✗ | ✗ | ✗ | ✗ | ✓✓ | ✗ | N/A |
+| **Isilon** | ✗ | ✗ | ✓✓ | ✗ | ✗ | ✗ | N/A |
+| **VAST** | ✗ | ✗ | ✓✓ | ✗ | ✗ | ✗ | N/A |
+| **LFS (Lustre)** | ✗ | ✗ | ✓✓ | ✗ | ✗ | ✗ | N/A |
+| **IFX Billing** | ✗ | ✗ | ✓✓ | ✗ | ✗ | ✗ | N/A |
+| **Starfish** | ✗ | ✗ | ✓✓ | ✗ | ✗ | ✗ | N/A |
+| **SlurmREST** | ✗ | ✗ | ✓✓ | ✗ | ✗ | ✗ | N/A |
+| **FASRC Custom** | ✗ | ✗ | ✓✓ | ✗ | ✗ | ✗ | N/A |
 
 *Legend: ✓ = Present, ✓✓ = Unique/Enhanced, ✗ = Not present, N/A = Not applicable*
 
@@ -509,13 +689,22 @@ These features would benefit the entire ColdFront community:
    - Departments plugin (with generic backends)
    - Hardware procurements plugin (with generic data sources)
 
-2. **From WUSTL:**
+2. **From NERC:**
+   - **Cloud plugin (highest priority)** - OpenStack/OpenShift integration
+   - Kubernetes deployment manifests and Dockerfile
+   - Quota unit system concept
+   - GPU-aware quota management
+   - Storage class-aware quotas
+   - Containerization best practices
+   - OIDC/Keycloak user search integration
+
+3. **From WUSTL:**
    - Qumulo plugin architecture could be generalized for other storage systems
    - React frontend pattern for modern UI components
    - Service-oriented architecture pattern
    - ITSM integration pattern
 
-3. **From Harvard:**
+4. **From Harvard:**
    - Department module in core
    - SlurmREST plugin (modern alternative to slurm plugin)
    - Storage plugin architecture (generalizing Isilon/VAST/LFS patterns)
@@ -588,7 +777,8 @@ The ColdFront ecosystem shows healthy diversity with institutions extending the 
 1. **Berkeley (MyBRC/MyLRC)** - Most extensive divergence with full REST API, billing, and user management features
 2. **Harvard (FASRC)** - Multiple storage system integrations and custom billing (IFX)
 3. **WUSTL** - Modern frontend technologies and comprehensive Qumulo integration
-4. **UBCCR** - Upstream maintains automation features and OpenLDAP integration
+4. **NERC** - Cloud-native deployment with OpenStack/OpenShift integration, Kubernetes-first architecture
+5. **UBCCR** - Upstream maintains automation features and OpenLDAP integration
 
 ### Unity Portal Position
 
@@ -619,6 +809,8 @@ However, running both systems in parallel might create confusion about which is 
 | **Berkeley MyBRC/MyLRC** | `/coldfront/` | [https://github.com/ucb-rit/coldfront](https://github.com/ucb-rit/coldfront) |
 | **Harvard FASRC** | `/harvard/coldfront/` | [https://github.com/fasrc/coldfront](https://github.com/fasrc/coldfront) |
 | **WUSTL** | `/wustl/coldfront-wustl-fork/` | [https://github.com/WashU-IT-RIS/coldfront-wustl-fork](https://github.com/WashU-IT-RIS/coldfront-wustl-fork) |
+| **NERC - ColdFront Container** | `/nerc/coldfront-nerc/` | [https://github.com/nerc-project/coldfront-nerc](https://github.com/nerc-project/coldfront-nerc) |
+| **NERC - Cloud Plugin** | `/nerc/coldfront-plugin-cloud/` | [https://github.com/nerc-project/coldfront-plugin-cloud](https://github.com/nerc-project/coldfront-plugin-cloud) |
 | **CCI-MOC** | `/cci-moc/coldfront/` | [https://github.com/CCI-MOC/coldfront](https://github.com/CCI-MOC/coldfront) |
 | **SUM** | `/sum/coldfront_pr_base/` | [https://github.com/SouthernMethodistUniversity/coldfront_pr_base](https://github.com/SouthernMethodistUniversity/coldfront_pr_base) |
 | **UMass Unity** | `/umass/unity-web-portal/` | [https://github.com/UnityHPC/unity-web-portal](https://github.com/UnityHPC/unity-web-portal) |

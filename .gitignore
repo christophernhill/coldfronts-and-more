@@ -6,6 +6,7 @@ wustl/
 cci-moc/
 sum/
 umass/
+nerc/
 find_forks/
 
 # Exclude helper files
