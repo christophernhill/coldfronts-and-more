@@ -682,15 +682,22 @@ External scripts are expected to:
 
 These features would benefit the entire ColdFront community:
 
-1. **From Berkeley:**
+1. **Integration with Internet2 Tools (NEW - Highest Strategic Priority):**
+   - **Grouper integration plugin** - Self-service group management, delegation to PIs
+   - **COmanage integration plugin** - Identity lifecycle, external collaborator management
+   - Combined architecture for identity → groups → allocations workflow
+   - Would address self-service needs across ALL ColdFront deployments
+   - Reference implementations needed; NERC architecture provides good model
+
+2. **From Berkeley:**
    - REST API framework (allocation, project, user endpoints)
    - Statistics module for job tracking
    - Allocation renewal request workflow
    - Departments plugin (with generic backends)
    - Hardware procurements plugin (with generic data sources)
 
-2. **From NERC:**
-   - **Cloud plugin (highest priority)** - OpenStack/OpenShift integration
+3. **From NERC:**
+   - **Cloud plugin** - OpenStack/OpenShift integration
    - Kubernetes deployment manifests and Dockerfile
    - Quota unit system concept
    - GPU-aware quota management
@@ -698,13 +705,13 @@ These features would benefit the entire ColdFront community:
    - Containerization best practices
    - OIDC/Keycloak user search integration
 
-3. **From WUSTL:**
+4. **From WUSTL:**
    - Qumulo plugin architecture could be generalized for other storage systems
    - React frontend pattern for modern UI components
    - Service-oriented architecture pattern
    - ITSM integration pattern
 
-4. **From Harvard:**
+5. **From Harvard:**
    - Department module in core
    - SlurmREST plugin (modern alternative to slurm plugin)
    - Storage plugin architecture (generalizing Isilon/VAST/LFS patterns)
@@ -744,7 +751,246 @@ Unity Portal features are generally **not applicable to ColdFront** due to archi
 
 ---
 
-## 5. Notable Differences in Approach
+## 5. Potential Integration with Internet2 Identity and Access Management Tools
+
+ColdFront projects could significantly benefit from integration with Internet2's mature identity and access management systems, particularly [Grouper](https://github.com/Internet2/grouper) and [COmanage Registry](https://github.com/Internet2/comanage-registry). These tools address common challenges in research computing environments and could complement ColdFront's allocation management capabilities.
+
+### 5.1 Internet2 Grouper Integration
+
+[Grouper](https://www.internet2.edu/products-services/trust-identity-middleware/grouper/) is an enterprise access management system designed for highly distributed management environments common to universities and research institutions.
+
+#### What Grouper Provides
+
+- **Distributed Group Management**: Enables delegation of group management to PIs, department heads, and project leaders
+- **Hierarchical Group Structure**: Supports nested groups and complex organizational structures
+- **Single Point of Control**: One change to group membership automatically propagates to all connected applications
+- **Role-Based Access Control (RBAC)**: Sophisticated permission models for who can manage groups
+- **REST Web Services API**: Modern API for integration with other applications
+- **Audit Trail**: Complete history of group changes and membership modifications
+- **Multiple Applications Support**: Groups can be synchronized to LDAP, Active Directory, mailing lists, wikis, and more
+
+#### How Grouper Could Enhance ColdFront
+
+1. **Self-Service Group Management**
+   - PIs could manage their own research group memberships
+   - Project members could be added/removed without admin intervention
+   - Automatic synchronization of Grouper groups to ColdFront project memberships
+   - Reduces administrative burden on center staff
+
+2. **Complex Membership Scenarios**
+   - Support for nested groups (e.g., Department → Lab → Project → Subproject)
+   - Composite groups (unions, intersections, exclusions)
+   - Automatic group membership based on attributes (e.g., all faculty in a department)
+   - Time-limited memberships with automatic expiration
+
+3. **Multi-Level Approval Workflows**
+   - PI approves member joining their group in Grouper
+   - ColdFront automatically detects new member
+   - Resource allocation workflows can leverage existing Grouper approvals
+   - Reduces duplicate approval processes
+
+4. **Cross-Institution Collaboration**
+   - Grouper excels at federated environments
+   - External collaborators can be added to groups via federation
+   - ColdFront allocations could extend to federated users
+   - Particularly valuable for multi-institutional research projects
+
+5. **Integration Architecture**
+   ```
+   Grouper (Group Management) 
+      ↓ (REST API / LDAP Sync)
+   ColdFront (Resource Allocation)
+      ↓ (Provisioning)
+   Resources (HPC, Storage, Cloud)
+   ```
+
+#### Example Use Cases
+
+**Current State**: PI emails admin to add 3 students to their allocation. Admin manually adds them to ColdFront, then provisions accounts on HPC systems.
+
+**With Grouper**: PI adds students to their Grouper group. ColdFront detects the change and automatically initiates allocation addition workflow. Upon approval, provisioning happens automatically.
+
+**Current State**: Department wants all faculty to have access to a shared storage allocation. Admin maintains list manually.
+
+**With Grouper**: Department maintains a "Faculty" group in Grouper with automatic membership rules. ColdFront allocation is linked to this group. New faculty are automatically eligible; departing faculty automatically lose access.
+
+### 5.2 COmanage Registry Integration
+
+[COmanage Registry](https://www.internet2.edu/comanage) is a lifecycle management system and identity registry designed to track complex affiliations and identity relationships within collaborative organizations.
+
+#### What COmanage Registry Provides
+
+- **Identity Lifecycle Management**: Track people through hiring, role changes, and departure
+- **Organizational Registry**: Maintain organizational structure and relationships
+- **Multiple Affiliations**: Handle complex scenarios (person is staff + student + researcher)
+- **Self-Service Enrollment**: People can register themselves with appropriate approvals
+- **Collaboration Management**: Manage virtual organizations and research collaborations
+- **Identity Linking**: Connect institutional identities with external identities (ORCID, etc.)
+- **REST APIs**: Modern API for integration
+- **LDAP Provisioning**: Can provision to LDAP directories
+
+#### How COmanage Could Enhance ColdFront
+
+1. **Onboarding Automation**
+   - New users enroll in COmanage with PI sponsorship
+   - COmanage provisions basic identity information
+   - ColdFront receives vetted identity data
+   - Eliminates manual account creation processes
+
+2. **Affiliation Management**
+   - Track multiple roles (faculty + researcher, student + RA)
+   - ColdFront allocation eligibility based on affiliations
+   - Automatic removal from allocations when affiliations end
+   - Grace periods for departing users
+
+3. **Collaboration Lifecycle**
+   - Virtual organizations (VOs) managed in COmanage
+   - VO membership automatically reflects in ColdFront
+   - Project creation driven by COmanage collaboration setup
+   - End of collaboration triggers allocation cleanup
+
+4. **External Collaborator Management**
+   - COmanage handles external user vetting and sponsorship
+   - Integration with InCommon/eduGAIN federations
+   - ColdFront receives validated external identities
+   - Compliance with security requirements
+
+5. **Identity Federation**
+   - Link institutional accounts with external identities (ORCID, Google, etc.)
+   - Support multiple authentication methods
+   - Consistent identity across systems
+   - Better tracking of researcher outputs
+
+#### Example Use Cases
+
+**Current State**: New postdoc arrives. Manual process to create accounts in HR system, email, HPC, and ColdFront. Takes 2 weeks.
+
+**With COmanage**: PI sponsors postdoc in COmanage. Identity information flows automatically to all systems including ColdFront. Postdoc can access resources on day one.
+
+**Current State**: Multi-institutional grant team needs shared resources. Each institution's members need accounts at the lead institution's HPC center.
+
+**With COmanage**: Virtual organization created in COmanage. External members vetted through federation. ColdFront project automatically includes all VO members regardless of home institution.
+
+### 5.3 Combined Integration Architecture
+
+The most powerful approach combines all three systems:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     COmanage Registry                       │
+│              (Identity & Affiliation Lifecycle)              │
+│  • Self-service enrollment                                   │
+│  • Institutional & external identities                       │
+│  • Virtual organizations                                     │
+│  • Affiliation tracking                                      │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ↓ (Identity & VO data via API/LDAP)
+┌─────────────────────────────────────────────────────────────┐
+│                         Grouper                             │
+│                  (Group Management)                          │
+│  • PI-managed research groups                                │
+│  • Department groups                                         │
+│  • Automated group membership from COmanage VOs              │
+│  • Nested group structures                                   │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ↓ (Group membership via API/LDAP)
+┌─────────────────────────────────────────────────────────────┐
+│                       ColdFront                             │
+│              (Resource Allocation Management)                │
+│  • Project creation from Grouper groups                      │
+│  • Allocation requests from PIs                              │
+│  • Automatic member provisioning                             │
+│  • Usage tracking and reporting                              │
+└────────────────────┬────────────────────────────────────────┘
+                     │
+                     ↓ (Provisioning via APIs/Scripts)
+┌─────────────────────────────────────────────────────────────┐
+│                    Compute Resources                        │
+│  HPC Clusters • Cloud Platforms • Storage Systems           │
+│  • Slurm accounts from ColdFront                             │
+│  • OpenStack projects from ColdFront (NERC plugin)           │
+│  • POSIX groups from Grouper                                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 5.4 Benefits of Integrated Approach
+
+**For PIs and Researchers:**
+- Self-service management of their groups
+- Faster onboarding of new team members
+- One place to manage membership (Grouper)
+- Automatic resource access based on group membership
+
+**For Research Computing Staff:**
+- Reduced manual intervention
+- Automated provisioning workflows
+- Better audit trails
+- Fewer support tickets for account management
+
+**For Institutions:**
+- Compliance with security requirements
+- Proper offboarding when people leave
+- Support for multi-institutional collaborations
+- Scalable to large user bases
+
+**For External Collaborators:**
+- Simplified access to resources
+- Federation support (InCommon/eduGAIN)
+- No need for separate institutional accounts
+- Consistent identity across institutions
+
+### 5.5 Current ColdFront Gaps That Grouper/COmanage Address
+
+1. **Berkeley's Departments Plugin** → Better served by COmanage's organizational registry
+2. **Unity Portal's PI Self-Service** → Grouper provides more sophisticated group management
+3. **Manual User Approval Workflows** → COmanage handles identity vetting and sponsorship
+4. **Limited Federation Support** → COmanage excels at federated identity
+5. **Complex Group Hierarchies** → Grouper's nested groups and composite groups
+6. **Affiliation Tracking** → COmanage tracks multiple complex affiliations
+
+### 5.6 Implementation Considerations
+
+**Which ColdFront Forks Would Benefit Most?**
+
+1. **Berkeley (MyBRC/MyLRC)**: Already has API infrastructure; could integrate Grouper groups as data source for departments plugin
+2. **Harvard (FASRC)**: Could replace custom LDAP integration with standard Grouper→LDAP provisioning
+3. **NERC**: COmanage could provide identity vetting for multi-institutional OpenStack/OpenShift projects
+4. **WUSTL**: Grouper integration could simplify Active Directory synchronization in Qumulo plugin
+5. **UBCCR**: Auto-compute allocation plugin could trigger from Grouper group creation
+
+**Integration Points:**
+
+- **COmanage → ColdFront**: REST API for identity data, affiliation information, VO membership
+- **Grouper → ColdFront**: REST API or LDAP sync for group membership
+- **ColdFront → Grouper**: Optionally write allocation approvals back as Grouper permissions
+- **All Three → LDAP**: Common provisioning target for downstream systems
+
+**Deployment Models:**
+
+1. **Full Stack**: COmanage + Grouper + ColdFront (maximum automation)
+2. **Grouper Only**: Add self-service group management to existing ColdFront
+3. **COmanage Only**: Improve identity lifecycle without changing group management
+4. **Hybrid**: Use COmanage for external collaborators, existing systems for internal users
+
+### 5.7 Recommended Next Steps
+
+For institutions considering this integration:
+
+1. **Pilot with Single Use Case**: Start with one research group using Grouper for self-service
+2. **Leverage Existing Infrastructure**: If already using COmanage or Grouper, integrate that first
+3. **API-First Approach**: Use REST APIs rather than LDAP sync for better real-time updates
+4. **Community Collaboration**: Multiple institutions implementing this could share integration code
+5. **Contribute Upstream**: Grouper/COmanage integration plugins could benefit entire ColdFront community
+
+**Reference Implementations:**
+
+While no ColdFront fork currently has full Grouper/COmanage integration, the NERC plugin's architecture (external API integration, automated provisioning) provides a good model for how such integration could work.
+
+---
+
+## 6. Notable Differences in Approach
 
 ### ColdFront Forks - Common Philosophy
 - **Allocation-centric**: Focus on managing resource allocations
@@ -758,17 +1004,25 @@ Unity Portal features are generally **not applicable to ColdFront** due to archi
 - **LDAP-centric**: LDAP is source of truth
 - **Access-focused**: Getting users onto the cluster
 
+### Grouper/COmanage Philosophy
+- **Identity-first**: Build on solid identity foundation
+- **Delegation-focused**: Enable distributed management
+- **Standards-based**: Use standard protocols and APIs
+- **Collaboration-oriented**: Support complex multi-institutional scenarios
+
 ### Technology Evolution
 
 - **Berkeley**: Modernizing with comprehensive REST API, expiring tokens
 - **WUSTL**: Modern frontend with React, microservices patterns
 - **Harvard**: Multiple storage backend integrations, gRPC
+- **NERC**: Cloud-native with Kubernetes, containerization
 - **UBCCR**: Automation via signals, OpenLDAP integration
 - **Unity**: Staying with PHP, leveraging Shibboleth
+- **Internet2**: Enterprise-grade identity and group management (Grouper/COmanage)
 
 ---
 
-## 6. Conclusions
+## 7. Conclusions
 
 ### ColdFront Ecosystem
 
@@ -803,6 +1057,8 @@ However, running both systems in parallel might create confusion about which is 
 
 ## Appendix: Repository Locations
 
+### ColdFront Forks and Portals
+
 | Institution | Local Path | GitHub Repository |
 |-------------|------------|-------------------|
 | **UBCCR Upstream** | `/ubccr/coldfront/` | [https://github.com/ubccr/coldfront](https://github.com/ubccr/coldfront) |
@@ -814,6 +1070,13 @@ However, running both systems in parallel might create confusion about which is 
 | **CCI-MOC** | `/cci-moc/coldfront/` | [https://github.com/CCI-MOC/coldfront](https://github.com/CCI-MOC/coldfront) |
 | **SUM** | `/sum/coldfront_pr_base/` | [https://github.com/SouthernMethodistUniversity/coldfront_pr_base](https://github.com/SouthernMethodistUniversity/coldfront_pr_base) |
 | **UMass Unity** | `/umass/unity-web-portal/` | [https://github.com/UnityHPC/unity-web-portal](https://github.com/UnityHPC/unity-web-portal) |
+
+### Related Internet2 Identity and Access Management Tools
+
+| Tool | Purpose | GitHub Repository | Documentation |
+|------|---------|-------------------|---------------|
+| **Internet2 Grouper** | Enterprise group and access management | [https://github.com/Internet2/grouper](https://github.com/Internet2/grouper) | [Grouper Wiki](https://spaces.at.internet2.edu/display/Grouper/Grouper+Wiki+Home) |
+| **COmanage Registry** | Identity lifecycle and collaboration management | [https://github.com/Internet2/comanage-registry](https://github.com/Internet2/comanage-registry) | [COmanage Wiki](https://spaces.at.internet2.edu/display/COmanage/Home) |
 
 ---
 
