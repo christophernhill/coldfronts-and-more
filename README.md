@@ -687,7 +687,8 @@ These features would benefit the entire ColdFront community:
    - **COmanage integration plugin** - Identity lifecycle, external collaborator management
    - Combined architecture for identity → groups → allocations workflow
    - Would address self-service needs across ALL ColdFront deployments
-   - Reference implementations needed; NERC architecture provides good model
+   - **ACCESS CI provides working reference implementation** (see Section 5.3)
+   - NERC architecture provides good model for cloud-native deployment
 
 2. **From Berkeley:**
    - REST API framework (allocation, project, user endpoints)
@@ -871,7 +872,260 @@ ColdFront projects could significantly benefit from integration with Internet2's
 
 **With COmanage**: Virtual organization created in COmanage. External members vetted through federation. ColdFront project automatically includes all VO members regardless of home institution.
 
-### 5.3 Combined Integration Architecture
+### 5.3 ACCESS CI: A Real-World Implementation
+
+[ACCESS (Advanced Cyberinfrastructure Coordination Ecosystem: Services & Support)](https://access-ci.org) provides a production example of how COmanage Registry and Internet2 Grouper work together to manage identity and access for a large-scale research computing infrastructure. ACCESS serves as the NSF-funded national cyberinfrastructure coordination platform, supporting thousands of researchers across multiple institutions and resource providers.
+
+#### How ACCESS Uses COmanage Registry
+
+ACCESS leverages COmanage Registry as the foundational identity management layer with the following capabilities:
+
+**1. Enrollment Workflows**
+- Researchers initiate registration through structured enrollment flows
+- Multi-step verification processes ensure data quality and security compliance
+- Capture required information: institutional affiliation, ORCID, research interests, etc.
+- Automated validation of email addresses and institutional affiliations
+- Integration with InCommon/eduGAIN federation for federated authentication
+
+**2. Invitations and Approvals**
+- PIs can invite collaborators (internal and external) to join ACCESS
+- External collaborators without institutional logins can be sponsored
+- Multi-stage approval workflows:
+  - PI sponsorship for external users
+  - Security office review for non-federated accounts
+  - Automatic approval for federated institutional accounts
+- Time-limited sponsorships with automatic renewal reminders
+
+**3. Collaboration Roster Management**
+- Maintains canonical roster of who is participating in which collaborations
+- Tracks multiple affiliations per person (researcher at Institution A, collaborator on Project B)
+- Records role changes over time (student → postdoc → faculty)
+- Provides self-service interface for researchers to update their profile information
+- Manages identity linking (institutional ID ↔ ORCID ↔ ACCESS ID)
+
+**4. Affiliation Lifecycle**
+- Handles complex affiliation scenarios:
+  - Multi-institutional affiliations (joint appointments)
+  - Temporary affiliations (visiting scholars)
+  - External collaborators (industry, international)
+- Grace periods for role transitions
+- Automated notifications to PIs when sponsored users' affiliations are ending
+
+#### How ACCESS Uses Internet2 Grouper
+
+ACCESS uses Grouper as the group management and access control layer that sits between identity (COmanage) and resources:
+
+**1. Group and Role Modeling for Projects**
+- Each allocation request creates a project group in Grouper
+- Hierarchical group structure:
+  ```
+  access:projects:<project-id>
+    ├── access:projects:<project-id>:admins (PI and Co-PIs)
+    ├── access:projects:<project-id>:members (all authorized users)
+    └── access:projects:<project-id>:pending (awaiting approval)
+  ```
+- Role-based sub-groups within projects:
+  - `admins` - PIs/Co-PIs who can manage membership
+  - `members` - Researchers with active access
+  - `pending` - Users awaiting PI approval to join
+
+**2. Delegated Administration to PIs**
+- PIs receive automatic Grouper privileges to manage their project groups
+- PIs can:
+  - Add members to their project groups (without contacting central IT)
+  - Remove members when they leave the project
+  - Designate other Co-PIs with admin privileges
+  - View membership history and audit logs
+- Self-service interface for PIs to manage team membership
+- Reduces administrative burden on ACCESS operations staff
+- Enables rapid onboarding of new team members (hours instead of days)
+
+**3. Provisioning to Apps and Resources**
+- Grouper groups are the **authorization mechanism** for resource access
+- Integration points:
+  - **XRAS (eXtensible Resource Allocation Service)**: Allocation management system
+  - **Resource Provider Systems**: Individual HPC centers' systems (TACC, SDSC, PSC, etc.)
+  - **Community Platforms**: Science gateways, data repositories
+  - **Support Systems**: Ticketing, documentation access
+- Provisioning workflow:
+  ```
+  1. PI adds user to Grouper project group
+  2. Grouper synchronizes membership changes
+  3. Provisioning connectors detect change
+  4. User account created/enabled at resource providers
+  5. User receives automated welcome email with access instructions
+  ```
+- Automatic de-provisioning when users are removed from groups
+- Near real-time propagation (typically within 15-30 minutes)
+
+**4. Complex Group Policies**
+- Composite groups for complex access scenarios:
+  - Union: `users-on-cluster-A = project-1 OR project-2 OR project-3`
+  - Intersection: `gpu-access = has-allocation AND passed-training`
+  - Exclusion: `active-users = all-users MINUS suspended-users`
+- Time-limited memberships that auto-expire with allocation end dates
+- Automatic group membership based on attributes in COmanage
+
+#### ACCESS Workflow Example: From Enrollment to Resource Access
+
+**Step 1: Identity Establishment (COmanage Registry)**
+- New researcher registers via ACCESS portal
+- Authenticates using institutional credentials (InCommon federation)
+- COmanage creates ACCESS identity and links to institutional identity
+- Profile information captured (ORCID, research domains, publications)
+
+**Step 2: Allocation Request (XRAS)**
+- PI submits allocation request through ACCESS allocation system
+- Request includes: compute hours needed, resource(s) requested, team members
+- Peer review process (for large allocations)
+- Upon approval, XRAS creates allocation record
+
+**Step 3: Group Creation (Grouper)**
+- XRAS triggers Grouper to create project group hierarchy
+- PI automatically assigned as group admin
+- Initial team members added to group from allocation request
+- Group policies set based on allocation parameters
+
+**Step 4: Delegated Team Management (Grouper)**
+- PI invites additional team member (postdoc who joined lab)
+- Postdoc already has ACCESS identity from COmanage (Step 1)
+- PI adds postdoc to project group via self-service portal
+- No central ACCESS staff involvement required
+
+**Step 5: Resource Provisioning (Automated)**
+- Grouper provisioning connector detects new member
+- Triggers account creation at allocated resource provider(s)
+- Resource provider systems:
+  - Create HPC cluster account
+  - Add to appropriate Slurm accounts
+  - Set up storage quotas
+  - Configure authentication (SSH keys, Kerberos)
+- Automated notification email sent to user
+
+**Step 6: Lifecycle Management**
+- Allocation expires → Grouper automatically removes access
+- PI removes departed team member → De-provisioning triggered
+- Grace period implemented for data retrieval before account deletion
+- Audit trail maintained throughout
+
+#### Alignment with ColdFront Projects
+
+ACCESS's architecture demonstrates how COmanage and Grouper can address common ColdFront pain points:
+
+**1. Self-Service Reduces Administrative Burden**
+- ColdFront currently: Admin must manually add users to projects and allocations
+- With Grouper (ACCESS model): PI adds users to Grouper group; ColdFront syncs automatically
+- Benefit: Faster onboarding, fewer support tickets, scales to larger user bases
+
+**2. Federation Support for Multi-Institutional Projects**
+- ColdFront currently: External collaborators need manual account creation
+- With COmanage (ACCESS model): Federated login or PI sponsorship; automatic account provisioning
+- Benefit: Support for multi-institutional research teams, industry partnerships, international collaboration
+
+**3. Unified Identity Across Resources**
+- ColdFront currently: Separate identity tracking per resource
+- With COmanage (ACCESS model): Single identity links to all resources via Grouper groups
+- Benefit: Consistent identity, better compliance, simplified audit
+
+**4. Complex Group Hierarchies**
+- ColdFront currently: Flat project membership structure
+- With Grouper (ACCESS model): Nested groups (Department → Lab → Project → Subproject)
+- Benefit: Better models research organizational structures, enables department-wide allocations
+
+**5. Automated Provisioning Workflows**
+- ColdFront currently: Allocation approved → Manual steps to provision accounts
+- With Grouper (ACCESS model): Allocation approved → Group membership → Automatic provisioning
+- Benefit: Faster time-to-science, fewer manual errors, better audit trail
+
+**6. Time-Limited Access**
+- ColdFront currently: Allocations expire, but cleanup is often manual
+- With Grouper (ACCESS model): Group membership automatically expires with allocation
+- Benefit: Better security posture, automatic compliance with allocation terms
+
+#### Implementation Considerations for ColdFront Forks
+
+ColdFront projects considering adoption of the ACCESS model should note:
+
+**Which Forks Would Benefit Most:**
+
+1. **Berkeley (MyBRC/MyLRC)**
+   - Already has REST API infrastructure
+   - Departments plugin could be replaced by Grouper's organizational groups
+   - Billing module could use Grouper group membership for charge attribution
+   - Multi-lab structure (MyBRC + MyLRC) maps well to Grouper's hierarchical groups
+
+2. **Harvard (FASRC)**
+   - Multiple custom LDAP integrations could be consolidated through Grouper→LDAP provisioning
+   - Department core module could leverage Grouper organizational groups
+   - IFX billing integration could use Grouper membership for cost allocation
+
+3. **NERC (Cloud Platform)**
+   - Multi-institutional OpenStack/OpenShift projects are exactly what COmanage excels at
+   - External collaborator management is critical for cloud resources
+   - Keycloak integration already in place; COmanage can provision to Keycloak
+   - Automated OpenStack tenant creation could trigger from Grouper group creation
+
+4. **WUSTL (Qumulo)**
+   - Active Directory synchronization could be driven by Grouper
+   - ITSM (ServiceNow) integration could leverage Grouper for approval workflows
+   - React frontend could provide PI-facing group management interface
+
+5. **UBCCR (Upstream)**
+   - Auto-compute allocation plugin could create Grouper groups instead of direct provisioning
+   - Project OpenLDAP plugin could be downstream target of Grouper provisioning
+   - Would benefit entire ColdFront community as reference implementation
+
+**Integration Architecture Options:**
+
+**Option A: Grouper as Source of Truth** (Most like ACCESS)
+```
+COmanage (Identity) → Grouper (Groups) → ColdFront (Allocations) → Resources
+```
+- ColdFront reads project membership from Grouper via API
+- Allocation requests trigger Grouper group creation
+- PIs manage membership in Grouper; ColdFront syncs automatically
+
+**Option B: Bidirectional Sync**
+```
+COmanage ↔ ColdFront ↔ Grouper → Resources
+```
+- ColdFront remains primary UI for project management
+- Project membership changes sync to Grouper for provisioning
+- Grouper group changes sync back to ColdFront
+
+**Option C: Parallel Systems**
+```
+COmanage → Grouper → Resources
+        ↘ ColdFront → Resources
+```
+- Grouper handles group-based access (basic cluster access)
+- ColdFront handles allocation-based access (storage quotas, special resources)
+- Both provision to same resources via different mechanisms
+
+**Technical Integration Requirements:**
+
+- **APIs**: Grouper REST API, COmanage REST API, ColdFront would need API consumers
+- **Authentication**: Shared authentication (OIDC, SAML) across all three systems
+- **Data Sync**: Real-time or near-real-time synchronization (event-driven or polling)
+- **Provisioning**: Standard connectors (LDAP, REST, SCIM) to downstream systems
+- **Audit**: Unified audit logging across systems for compliance
+
+**Deployment Complexity:**
+
+- **Full Stack** (COmanage + Grouper + ColdFront): High initial effort, maximum long-term automation
+- **Grouper Only**: Medium effort, addresses self-service group management
+- **COmanage Only**: Medium effort, addresses external collaborator and identity lifecycle
+- **Phased Approach**: Start with one use case (e.g., external collaborators in COmanage), expand over time
+
+#### Key Takeaways from ACCESS Implementation
+
+1. **Separation of Concerns Works**: Identity (COmanage), Groups (Grouper), Allocations (XRAS), Resources (providers) each have clear responsibilities
+2. **Delegation is Critical**: PI self-service for group management dramatically reduces administrative burden
+3. **Federation is Essential**: Multi-institutional research requires federated identity infrastructure
+4. **Automation Scales**: Automated provisioning from group membership enables large user bases (ACCESS has 100K+ users)
+5. **Standards Matter**: Using standard protocols (LDAP, SAML, SCIM) enables integration with diverse resources
+
+### 5.4 Combined Integration Architecture
 
 The most powerful approach combines all three systems:
 
@@ -915,7 +1169,7 @@ The most powerful approach combines all three systems:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 5.4 Benefits of Integrated Approach
+### 5.5 Benefits of Integrated Approach
 
 **For PIs and Researchers:**
 - Self-service management of their groups
@@ -941,7 +1195,7 @@ The most powerful approach combines all three systems:
 - No need for separate institutional accounts
 - Consistent identity across institutions
 
-### 5.5 Current ColdFront Gaps That Grouper/COmanage Address
+### 5.6 Current ColdFront Gaps That Grouper/COmanage Address
 
 1. **Berkeley's Departments Plugin** → Better served by COmanage's organizational registry
 2. **Unity Portal's PI Self-Service** → Grouper provides more sophisticated group management
@@ -950,7 +1204,7 @@ The most powerful approach combines all three systems:
 5. **Complex Group Hierarchies** → Grouper's nested groups and composite groups
 6. **Affiliation Tracking** → COmanage tracks multiple complex affiliations
 
-### 5.6 Implementation Considerations
+### 5.7 Implementation Considerations
 
 **Which ColdFront Forks Would Benefit Most?**
 
@@ -974,7 +1228,7 @@ The most powerful approach combines all three systems:
 3. **COmanage Only**: Improve identity lifecycle without changing group management
 4. **Hybrid**: Use COmanage for external collaborators, existing systems for internal users
 
-### 5.7 Recommended Next Steps
+### 5.8 Recommended Next Steps
 
 For institutions considering this integration:
 
@@ -1004,11 +1258,12 @@ While no ColdFront fork currently has full Grouper/COmanage integration, the NER
 - **LDAP-centric**: LDAP is source of truth
 - **Access-focused**: Getting users onto the cluster
 
-### Grouper/COmanage Philosophy
+### Grouper/COmanage Philosophy (ACCESS CI Model)
 - **Identity-first**: Build on solid identity foundation
 - **Delegation-focused**: Enable distributed management
 - **Standards-based**: Use standard protocols and APIs
 - **Collaboration-oriented**: Support complex multi-institutional scenarios
+- **Proven at scale**: ACCESS CI demonstrates this with 100K+ users across multiple institutions
 
 ### Technology Evolution
 
@@ -1050,8 +1305,21 @@ There could be value in:
 1. ColdFront importing users from Unity (Unity handles onboarding, ColdFront handles allocations)
 2. Unity reading group information from ColdFront (ColdFront as source of truth for allocations)
 3. Both systems updating the same LDAP backend but managing different aspects
+4. **ColdFront + COmanage + Grouper** (ACCESS CI model) - Most comprehensive solution for large-scale, multi-institutional deployments
 
 However, running both systems in parallel might create confusion about which is the "source of truth" for different data elements.
+
+### ACCESS CI as a Model for ColdFront Evolution
+
+ACCESS CI's implementation of COmanage Registry and Internet2 Grouper provides a proven, production-ready model that addresses many common pain points across ColdFront deployments:
+
+- **Self-service group management** reduces administrative burden
+- **Federated identity support** enables multi-institutional collaboration
+- **Automated provisioning workflows** scale to large user bases
+- **Delegated administration** empowers PIs to manage their teams
+- **Standards-based integration** simplifies connection to diverse resources
+
+ColdFront projects considering modernization of their identity and access management should evaluate the ACCESS model as described in Section 5.3. The integration patterns are applicable to all ColdFront forks, with each fork potentially benefiting in different ways based on their specific needs and existing infrastructure.
 
 ---
 
@@ -1077,6 +1345,7 @@ However, running both systems in parallel might create confusion about which is 
 |------|---------|-------------------|---------------|
 | **Internet2 Grouper** | Enterprise group and access management | [https://github.com/Internet2/grouper](https://github.com/Internet2/grouper) | [Grouper Wiki](https://spaces.at.internet2.edu/display/Grouper/Grouper+Wiki+Home) |
 | **COmanage Registry** | Identity lifecycle and collaboration management | [https://github.com/Internet2/comanage-registry](https://github.com/Internet2/comanage-registry) | [COmanage Wiki](https://spaces.at.internet2.edu/display/COmanage/Home) |
+| **ACCESS CI** | NSF cyberinfrastructure coordination (uses COmanage + Grouper) | N/A (production deployment) | [ACCESS Support](https://access-ci.org) |
 
 ---
 
